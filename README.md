@@ -10,7 +10,7 @@ After cloning the github, you will want to do the following to get the code runn
 
 After this, the project will be running on your localhost. 
 Typically at http://localhost:3000/
-Got it! Here's the revised README file focusing on `index.js` (assuming it's the entry point or main file for your React application):
+
 
 ---
 
