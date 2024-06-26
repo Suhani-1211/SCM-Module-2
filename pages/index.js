@@ -95,6 +95,56 @@ export default function HomePage() {
     }
   };
 
+  const transferOwnership = async () => {
+    if (atm) {
+      setLoading(true);
+      setMessage("Transferring ownership...");
+      try {
+        let tx = await atm.transferOwnership("0xNewOwnerAddress");
+        await tx.wait();
+        setMessage("Ownership transferred successfully!");
+      } catch (error) {
+        setMessage("Ownership transfer failed.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const increaseBalance = async () => {
+    if (atm) {
+      setLoading(true);
+      setMessage("Increasing balance...");
+      try {
+        let tx = await atm.increaseBalance(10); // increase by 10 ETH
+        await tx.wait();
+        getBalance();
+        setMessage("Balance increased successfully!");
+      } catch (error) {
+        setMessage("Balance increase failed.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const decreaseBalance = async () => {
+    if (atm) {
+      setLoading(true);
+      setMessage("Decreasing balance...");
+      try {
+        let tx = await atm.decreaseBalance(5); // decrease by 5 ETH
+        await tx.wait();
+        getBalance();
+        setMessage("Balance decreased successfully!");
+      } catch (error) {
+        setMessage("Balance decrease failed.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const initUser = () => {
     // Check to see if user has Metamask
     if (!ethWallet) {
@@ -116,6 +166,9 @@ export default function HomePage() {
         <p>Your Balance: {balance} ETH</p>
         <button className="btn deposit" onClick={deposit} disabled={loading}>Deposit 1 ETH</button>
         <button className="btn withdraw" onClick={withdraw} disabled={loading}>Withdraw 1 ETH</button>
+        <button className="btn" onClick={transferOwnership} disabled={loading}>Transfer Ownership</button>
+        <button className="btn" onClick={increaseBalance} disabled={loading}>Increase Balance by 10 ETH</button>
+        <button className="btn" onClick={decreaseBalance} disabled={loading}>Decrease Balance by 5 ETH</button>
         {loading && <p>Loading...</p>}
         <p>{message}</p>
       </div>
