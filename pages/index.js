@@ -9,68 +9,84 @@ export default function HomePage() {
   const [balance, setBalance] = useState(undefined);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [amount, setAmount] = useState(0);
+  const [transactions, setTransactions] = useState([]);
 
-  const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+  const contractAddress = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"; // Update to your contract address
   const atmABI = atm_abi.abi;
 
+  // Get and set wallet
   const getWallet = async () => {
     if (window.ethereum) {
       setEthWallet(window.ethereum);
-    }
-
-    if (ethWallet) {
-      const accounts = await ethWallet.request({ method: "eth_accounts" });
-      handleAccount(accounts);
-    }
-  };
-
-  const handleAccount = (accounts) => {
-    if (accounts && accounts.length > 0) {
-      console.log("Account connected: ", accounts[0]);
-      setAccount(accounts[0]);
+      try {
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        handleAccount(accounts);
+      } catch (error) {
+        console.error("Error accessing MetaMask:", error);
+        alert("Please connect to MetaMask.");
+      }
     } else {
-      console.log("No account found");
+      alert("Please install MetaMask to use this application.");
     }
   };
 
+  // Handle account from MetaMask
+  const handleAccount = (accounts) => {
+    if (accounts.length > 0) {
+      setAccount(accounts[0]);
+      getATMContract();
+    } else {
+      alert("No MetaMask account found. Please connect your MetaMask wallet.");
+    }
+  };
+
+  // MetaMask account connection
   const connectAccount = async () => {
     if (!ethWallet) {
-      alert('MetaMask wallet is required to connect');
+      alert("MetaMask is required to connect.");
       return;
     }
 
-    const accounts = await ethWallet.request({ method: 'eth_requestAccounts' });
-    handleAccount(accounts);
-
-    // once wallet is set we can get a reference to our deployed contract
-    getATMContract();
-  };
-
-  const getATMContract = () => {
-    const provider = new ethers.providers.Web3Provider(ethWallet);
-    const signer = provider.getSigner();
-    const atmContract = new ethers.Contract(contractAddress, atmABI, signer);
-
-    setATM(atmContract);
-  };
-
-  const getBalance = async () => {
-    if (atm) {
-      const balanceBigNumber = await atm.getBalance();
-      setBalance(balanceBigNumber.toNumber());
+    try {
+      const accounts = await ethWallet.request({ method: "eth_requestAccounts" });
+      handleAccount(accounts);
+    } catch (error) {
+      console.error("MetaMask connection error:", error);
     }
   };
 
+  // Get ATM contract
+  const getATMContract = () => {
+    if (!ethWallet) return;
+
+    const provider = new ethers.providers.Web3Provider(ethWallet);
+    const signer = provider.getSigner();
+    const atmContract = new ethers.Contract(contractAddress, atmABI, signer);
+    setATM(atmContract);
+  };
+
+  // Fetch balance
+  const getBalance = async () => {
+    if (atm) {
+      const balanceBigNumber = await atm.getBalance();
+      setBalance(ethers.utils.formatUnits(balanceBigNumber, "ether"));
+    }
+  };
+
+  // Deposit funds
   const deposit = async () => {
     if (atm) {
       setLoading(true);
       setMessage("Depositing...");
       try {
-        let tx = await atm.deposit(1);
+        const tx = await atm.deposit({ value: ethers.utils.parseUnits(amount, "ether") });
         await tx.wait();
         getBalance();
+        getTransactionHistory();
         setMessage("Deposit successful!");
       } catch (error) {
+        console.error("Deposit error:", error);
         setMessage("Deposit failed.");
       } finally {
         setLoading(false);
@@ -78,16 +94,19 @@ export default function HomePage() {
     }
   };
 
+  // Withdraw funds
   const withdraw = async () => {
     if (atm) {
       setLoading(true);
       setMessage("Withdrawing...");
       try {
-        let tx = await atm.withdraw(1);
+        const tx = await atm.withdraw(ethers.utils.parseUnits(amount, "ether"));
         await tx.wait();
         getBalance();
+        getTransactionHistory();
         setMessage("Withdrawal successful!");
       } catch (error) {
+        console.error("Withdraw error:", error);
         setMessage("Withdrawal failed.");
       } finally {
         setLoading(false);
@@ -95,15 +114,17 @@ export default function HomePage() {
     }
   };
 
-  const transferOwnership = async () => {
+  // Transfer ownership
+  const transferOwnership = async (newOwnerAddress) => {
     if (atm) {
       setLoading(true);
       setMessage("Transferring ownership...");
       try {
-        let tx = await atm.transferOwnership("0xNewOwnerAddress");
+        const tx = await atm.transferOwnership(newOwnerAddress);
         await tx.wait();
         setMessage("Ownership transferred successfully!");
       } catch (error) {
+        console.error("Ownership transfer error:", error);
         setMessage("Ownership transfer failed.");
       } finally {
         setLoading(false);
@@ -111,16 +132,19 @@ export default function HomePage() {
     }
   };
 
+  // Increase balance
   const increaseBalance = async () => {
     if (atm) {
       setLoading(true);
       setMessage("Increasing balance...");
       try {
-        let tx = await atm.increaseBalance(10); // increase by 10 ETH
+        const tx = await atm.increaseBalance(ethers.utils.parseUnits(amount, "ether"));
         await tx.wait();
         getBalance();
+        getTransactionHistory();
         setMessage("Balance increased successfully!");
       } catch (error) {
+        console.error("Increase balance error:", error);
         setMessage("Balance increase failed.");
       } finally {
         setLoading(false);
@@ -128,16 +152,19 @@ export default function HomePage() {
     }
   };
 
+  // Decrease balance
   const decreaseBalance = async () => {
     if (atm) {
       setLoading(true);
       setMessage("Decreasing balance...");
       try {
-        let tx = await atm.decreaseBalance(5); // decrease by 5 ETH
+        const tx = await atm.decreaseBalance(ethers.utils.parseUnits(amount, "ether"));
         await tx.wait();
         getBalance();
+        getTransactionHistory();
         setMessage("Balance decreased successfully!");
       } catch (error) {
+        console.error("Decrease balance error:", error);
         setMessage("Balance decrease failed.");
       } finally {
         setLoading(false);
@@ -145,15 +172,26 @@ export default function HomePage() {
     }
   };
 
+  // Get transaction history
+  const getTransactionHistory = async () => {
+    if (atm) {
+      const txHistory = await atm.getTransactionHistory();
+      setTransactions(txHistory.map(tx => ({
+        isDeposit: tx.isDeposit,
+        amount: ethers.utils.formatUnits(tx.amount, "ether"),
+        timestamp: new Date(tx.timestamp * 1000).toLocaleString(),
+      })));
+    }
+  };
+
+  // User interface initialization
   const initUser = () => {
-    // Check to see if user has Metamask
     if (!ethWallet) {
-      return <p>Please install Metamask in order to use this ATM.</p>;
+      return <p>Please install MetaMask to use the ATM.</p>;
     }
 
-    // Check to see if user is connected. If not, connect to their account
     if (!account) {
-      return <button className="btn connect" onClick={connectAccount}>Please connect your Metamask wallet</button>;
+      return <button onClick={connectAccount}>Connect MetaMask</button>;
     }
 
     if (balance === undefined) {
@@ -164,87 +202,43 @@ export default function HomePage() {
       <div>
         <p>Your Account: {account}</p>
         <p>Your Balance: {balance} ETH</p>
-        <button className="btn deposit" onClick={deposit} disabled={loading}>Deposit 1 ETH</button>
-        <button className="btn withdraw" onClick={withdraw} disabled={loading}>Withdraw 1 ETH</button>
-        <button className="btn" onClick={transferOwnership} disabled={loading}>Transfer Ownership</button>
-        <button className="btn" onClick={increaseBalance} disabled={loading}>Increase Balance by 10 ETH</button>
-        <button className="btn" onClick={decreaseBalance} disabled={loading}>Decrease Balance by 5 ETH</button>
+        <input
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="Amount in ETH"
+        />
+        <button onClick={deposit} disabled={loading}>Deposit</button>
+        <button onClick={withdraw} disabled={loading}>Withdraw</button>
+        <button onClick={() => transferOwnership("0xNewOwnerAddress")} disabled={loading}>Transfer Ownership</button>
+        <button onClick={increaseBalance} disabled={loading}>Increase Balance</button>
+        <button onClick={decreaseBalance} disabled={loading}>Decrease Balance</button>
+        <button onClick={getBalance} disabled={loading}>Refresh Balance</button>
         {loading && <p>Loading...</p>}
         <p>{message}</p>
+        <h2>Transaction History</h2>
+        <ul>
+          {transactions.map((tx, index) => (
+            <li key={index}>
+              {tx.isDeposit ? "Deposit" : "Withdrawal"} of {tx.amount} ETH at {tx.timestamp}
+            </li>
+          ))}
+        </ul>
       </div>
     );
   };
 
-  useEffect(() => { getWallet(); }, []);
+  // Effect to load wallet and account on app load
+  useEffect(() => {
+    getWallet();
+  }, []);
 
   return (
-    <main className="container">
+    <main>
       <header>
-        <h1>Welcome to the Metacrafters ATM!</h1>
+        <h1>Welcome to the ATM DApp</h1>
       </header>
       {initUser()}
-      <style jsx>{`
-        .container {
-          text-align: center;
-          padding: 2rem;
-          background-color: #f0f0f0;
-          border-radius: 10px;
-          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-          max-width: 600px;
-          margin: 2rem auto;
-        }
-
-        header h1 {
-          color: #333;
-        }
-
-        p {
-          font-size: 1.2rem;
-          color: #666;
-        }
-
-        .btn {
-          display: inline-block;
-          padding: 0.5rem 1rem;
-          margin: 0.5rem;
-          font-size: 1rem;
-          font-weight: bold;
-          color: #fff;
-          background-color: #0070f3;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-          transition: background-color 0.3s ease;
-        }
-
-        .btn:hover {
-          background-color: #005bb5;
-        }
-
-        .btn.deposit {
-          background-color: #28a745;
-        }
-
-        .btn.deposit:hover {
-          background-color: #218838;
-        }
-
-        .btn.withdraw {
-          background-color: #dc3545;
-        }
-
-        .btn.withdraw:hover {
-          background-color: #c82333;
-        }
-
-        .btn.connect {
-          background-color: #007bff;
-        }
-
-        .btn.connect:hover {
-          background-color: #0056b3;
-        }
-      `}</style>
     </main>
   );
 }
