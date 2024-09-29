@@ -4,16 +4,28 @@ pragma solidity ^0.8.9;
 contract Assessment {
     address payable public owner;
     uint256 public balance;
+    uint256 public minBalance;
+    
+    // Record of transactions
+    struct Transaction {
+        bool isDeposit;
+        uint256 amount;
+        uint256 timestamp;
+    }
+    Transaction[] public transactionHistory;
 
     event Deposit(uint256 amount);
     event Withdraw(uint256 amount);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event BalanceIncreased(uint256 amount);
     event BalanceDecreased(uint256 amount);
+    event MinBalanceSet(uint256 minBalance);
 
-    constructor(uint initBalance) payable {
+    constructor(uint256 initBalance, uint256 _minBalance) payable {
         owner = payable(msg.sender);
         balance = initBalance;
+        minBalance = _minBalance;
+        emit MinBalanceSet(_minBalance);
     }
 
     modifier onlyOwner() {
@@ -21,37 +33,60 @@ contract Assessment {
         _;
     }
 
+    modifier checkMinBalance(uint256 _amount, bool isWithdrawal) {
+        if (isWithdrawal) {
+            require(balance - _amount >= minBalance, "Insufficient balance after withdrawal");
+        }
+        _;
+    }
+
     function getBalance() public view returns (uint256) {
         return balance;
     }
 
-    function deposit(uint256 _amount) public payable onlyOwner {
-        uint _previousBalance = balance;
+    function setMinBalance(uint256 _minBalance) public onlyOwner {
+        minBalance = _minBalance;
+        emit MinBalanceSet(_minBalance);
+    }
 
-        // perform transaction
+    function getTransactionHistory() public view returns (Transaction[] memory) {
+        return transactionHistory;
+    }
+
+    function deposit(uint256 _amount) public payable onlyOwner {
+
+        // Perform transaction
         balance += _amount;
 
-        // assert transaction completed successfully
-        assert(balance == _previousBalance + _amount);
+        // Record transaction
+        transactionHistory.push(Transaction({
+            isDeposit: true,
+            amount: _amount,
+            timestamp: block.timestamp
+        }));
 
-        // emit the event
+        // Emit the event
         emit Deposit(_amount);
     }
 
-    function withdraw(uint256 _withdrawAmount) public onlyOwner {
-        uint _previousBalance = balance;
+    function withdraw(uint256 _withdrawAmount) public onlyOwner checkMinBalance(_withdrawAmount, true) {
+        
         if (balance >= _withdrawAmount) {
-            // withdraw the given amount
+            // Withdraw the given amount
             balance -= _withdrawAmount;
 
-            // assert the balance is correct
-            assert(balance == (_previousBalance - _withdrawAmount));
+            // Record transaction
+            transactionHistory.push(Transaction({
+                isDeposit: false,
+                amount: _withdrawAmount,
+                timestamp: block.timestamp
+            }));
 
-            // emit the event
+            // Emit the event
             emit Withdraw(_withdrawAmount);
         } else {
-            // handle insufficient balance
-            emit Withdraw(0); // withdraw nothing if balance is insufficient
+            // Handle insufficient balance
+            emit Withdraw(0); // Withdraw nothing if balance is insufficient
         }
     }
 
@@ -60,38 +95,58 @@ contract Assessment {
             emit OwnershipTransferred(owner, _newOwner);
             owner = _newOwner;
         } else {
-            // handle invalid new owner address
-            emit OwnershipTransferred(owner, owner); // no change in ownership
+            // Handle invalid new owner address
+            emit OwnershipTransferred(owner, owner); // No change in ownership
         }
     }
 
     function increaseBalance(uint256 _amount) public onlyOwner {
-        uint _previousBalance = balance;
+        
 
-        // increase balance
+        // Increase balance
         balance += _amount;
 
-        // assert the balance is correct
-        assert(balance == (_previousBalance + _amount));
+        // Record transaction
+        transactionHistory.push(Transaction({
+            isDeposit: true,
+            amount: _amount,
+            timestamp: block.timestamp
+        }));
 
-        // emit the event
+        // Emit the event
         emit BalanceIncreased(_amount);
     }
 
-    function decreaseBalance(uint256 _amount) public onlyOwner {
-        uint _previousBalance = balance;
+    function decreaseBalance(uint256 _amount) public onlyOwner checkMinBalance(_amount, true) {
+        
         if (balance >= _amount) {
-            // decrease balance
+            // Decrease balance
             balance -= _amount;
 
-            // assert the balance is correct
-            assert(balance == (_previousBalance - _amount));
+            // Record transaction
+            transactionHistory.push(Transaction({
+                isDeposit: false,
+                amount: _amount,
+                timestamp: block.timestamp
+            }));
 
-            // emit the event
+            // Emit the event
             emit BalanceDecreased(_amount);
         } else {
-            // handle insufficient balance
-            emit BalanceDecreased(0); // decrease nothing if balance is insufficient
+            // Handle insufficient balance
+            emit BalanceDecreased(0); // Decrease nothing if balance is insufficient
+        }
+    }
+
+    function batchDeposit(uint256[] memory _amounts) public onlyOwner {
+        for (uint i = 0; i < _amounts.length; i++) {
+            deposit(_amounts[i]);
+        }
+    }
+
+    function batchWithdraw(uint256[] memory _amounts) public onlyOwner {
+        for (uint i = 0; i < _amounts.length; i++) {
+            withdraw(_amounts[i]);
         }
     }
 }
