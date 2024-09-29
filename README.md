@@ -1,4 +1,3 @@
-Here's the updated `README.md` file with changes that reflect the updated `index.js` and the functionality of `Assessment.sol`.
 
 ---
 
